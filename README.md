@@ -1,6 +1,8 @@
-# Map The Solar System - Clean from Laggy Asteroids!
+# (Sara Info Version) Map The Solar System - Clean from Laggy Asteroids!
 
 My own model of the solar system, galaxy and the multiverse!
+
+NEW: You can now click on Earth!
 
 ## Previews:
 
