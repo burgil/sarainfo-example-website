@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Sidebar, type PerformanceSettings } from '@/components/Sidebar';
 import { ControlsHelp } from '@/components/ControlsHelp';
 import { HUD } from '@/components/HUD';
-import { EarthInfoPanel } from '@/components/EarthInfoPanel';
+import { PlanetInfoPanel } from '@/components/PlanetInfoPanel';
 import { SceneController } from '@/three/SceneController';
 
 export default function Home() {
@@ -17,7 +17,8 @@ export default function Home() {
   const [timeScale, setTimeScale] = useState(1);
   const [isTracking, setIsTracking] = useState(false);
   const [trackingTarget, setTrackingTarget] = useState<string | null>(null);
-  const [earthInfoVisible, setEarthInfoVisible] = useState(false);
+  const [selectedPlanet, setSelectedPlanet] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [performanceSettings, setPerformanceSettings] = useState({
     showLabels: true,
     showGalaxy: true,
@@ -30,6 +31,8 @@ export default function Home() {
     if (isInitialized.current || !containerRef.current) return;
     isInitialized.current = true;
 
+    const PLANETS = ['Mercury','Venus','Earth','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto','Eris','Makemake','Haumea'];
+
     const controller = new SceneController({
       container: containerRef.current,
       onObjectSelected: (name) => {
@@ -39,13 +42,13 @@ export default function Home() {
       onTrackingChange: (tracking, target) => {
         setIsTracking(tracking);
         setTrackingTarget(target);
-        // Hide Earth panel if we stop tracking Earth
-        if (!tracking || target !== 'Earth') {
-          setEarthInfoVisible(false);
+        // Hide panel if we stop tracking or switch to a non-planet
+        if (!tracking || !target || !PLANETS.includes(target)) {
+          setSelectedPlanet(null);
         }
       },
-      onEarthClick: () => {
-        setEarthInfoVisible(true);
+      onPlanetClick: (name) => {
+        setSelectedPlanet(name);
       },
     });
 
@@ -56,6 +59,12 @@ export default function Home() {
     controller.setLabelsVisible(true);
     controller.setPostProcessingEnabled(true);
 
+    // Default view: start focused on Earth
+    controller.flyTo('Earth');
+    setSelectedPlanet('Earth');
+    setIsTracking(true);
+    setTrackingTarget('Earth');
+
     return () => {
       controller.dispose();
       sceneRef.current = null;
@@ -64,8 +73,13 @@ export default function Home() {
 
   // Handlers
   const handleNavigate = useCallback((name: string) => {
+    const PLANETS = ['Mercury','Venus','Earth','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto','Eris','Makemake','Haumea'];
     sceneRef.current?.flyTo(name);
-    if (name === 'Earth') setEarthInfoVisible(true);
+    if (PLANETS.includes(name)) {
+      setSelectedPlanet(name);
+    } else {
+      setSelectedPlanet(null);
+    }
   }, []);
 
   const handleTimeScaleChange = useCallback((scale: number) => {
@@ -77,7 +91,7 @@ export default function Home() {
     sceneRef.current?.stopTracking();
     setIsTracking(false);
     setTrackingTarget(null);
-    setEarthInfoVisible(false);
+    setSelectedPlanet(null);
   }, []);
 
   const handlePerformanceSettingsChange = useCallback((settings: PerformanceSettings) => {
@@ -111,21 +125,27 @@ export default function Home() {
         onTimeScaleChange={handleTimeScaleChange}
         performanceSettings={performanceSettings}
         onPerformanceSettingsChange={handlePerformanceSettingsChange}
+        onOpenChange={setIsSidebarOpen}
       />
 
       {/* Controls help */}
       <ControlsHelp isLocked={isControlsLocked} />
 
-      {/* HUD - Speed, time, date */}
-      <HUD
-        getCurrentSpeed={getCurrentSpeed}
-        getSimulatedTime={getSimulatedTime}
-        timeScale={timeScale}
-      />
+      {/* HUD - only visible when sidebar is open */}
+      {isSidebarOpen && (
+        <HUD
+          getCurrentSpeed={getCurrentSpeed}
+          getSimulatedTime={getSimulatedTime}
+          timeScale={timeScale}
+        />
+      )}
 
-      {/* Earth info panel */}
-      {earthInfoVisible && (
-        <EarthInfoPanel onClose={() => setEarthInfoVisible(false)} />
+      {/* Planet info panel */}
+      {selectedPlanet && (
+        <PlanetInfoPanel
+          planetName={selectedPlanet}
+          onClose={() => setSelectedPlanet(null)}
+        />
       )}
 
       {/* Exit Focus Mode button */}

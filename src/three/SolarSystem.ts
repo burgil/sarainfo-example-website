@@ -243,9 +243,9 @@ export class SolarSystem {
   coronaMaterials: THREE.ShaderMaterial[] = [];
   loader: THREE.TextureLoader;
 
-  // Earth interaction
-  earthMesh: THREE.Mesh | null = null;
-  private earthOutlineMesh: THREE.Mesh | null = null;
+  // Planet interaction (hover/click outlines)
+  planetMeshes: Map<string, THREE.Mesh> = new Map();
+  private outlineMeshes: Map<string, THREE.Mesh> = new Map();
 
   private time = 0;
   private timeScale = 0.00084; // Default simulation speed - slow but visible motion
@@ -406,23 +406,6 @@ export class SolarSystem {
       planetMesh.rotation.z = THREE.MathUtils.degToRad(data.axialTilt);
       planetGroup.add(planetMesh);
 
-      // Earth hover outline (BackSide trick: slightly larger mesh renders green edges)
-      if (data.name === 'Earth') {
-        this.earthMesh = planetMesh;
-        const outlineMat = new THREE.MeshBasicMaterial({
-          color: 0x00ff66,
-          side: THREE.BackSide,
-          transparent: true,
-          opacity: 0.85,
-        });
-        const outlineMesh = new THREE.Mesh(geometry, outlineMat);
-        outlineMesh.scale.setScalar(1.08);
-        outlineMesh.visible = false;
-        outlineMesh.name = 'EarthOutline';
-        planetMesh.add(outlineMesh); // child of planetMesh → inherits all rotation
-        this.earthOutlineMesh = outlineMesh;
-      }
-
       // City lights layer (like old project - additive blending shows on dark side naturally)
       if (data.lightsUrl) {
         const lightsTexture = this.loader.load(data.lightsUrl);
@@ -448,6 +431,24 @@ export class SolarSystem {
       planetMesh.rotation.z = THREE.MathUtils.degToRad(data.axialTilt);
       planetGroup.add(planetMesh);
     }
+
+    // Register planet mesh for raycasting and add hover outline for all planets
+    planetMesh.userData.planetName = data.name;
+    this.planetMeshes.set(data.name, planetMesh);
+
+    const outlineMat = new THREE.MeshBasicMaterial({
+      color: 0x00ff66,
+      side: THREE.BackSide,
+      transparent: true,
+      opacity: 0.85,
+    });
+    const outlineMesh = new THREE.Mesh(geometry, outlineMat);
+    outlineMesh.scale.setScalar(1.08);
+    outlineMesh.visible = false;
+    outlineMesh.name = `${data.name}Outline`;
+    outlineMesh.userData.isOutline = true; // Excluded from frustum culling
+    planetMesh.add(outlineMesh); // child → inherits planet rotation automatically
+    this.outlineMeshes.set(data.name, outlineMesh);
 
     // Clouds layer (for Earth)
     if (data.cloudsUrl) {
@@ -740,9 +741,12 @@ export class SolarSystem {
     return Array.from(this.objects.keys());
   }
 
-  showEarthOutline(visible: boolean): void {
-    if (this.earthOutlineMesh) {
-      this.earthOutlineMesh.visible = visible;
-    }
+  showOutline(name: string, visible: boolean): void {
+    const mesh = this.outlineMeshes.get(name);
+    if (mesh) mesh.visible = visible;
+  }
+
+  clearAllOutlines(): void {
+    this.outlineMeshes.forEach(mesh => { mesh.visible = false; });
   }
 }

@@ -28,6 +28,7 @@ interface SidebarProps {
     onTimeScaleChange: (scale: number) => void;
     performanceSettings: PerformanceSettings;
     onPerformanceSettingsChange: (settings: PerformanceSettings) => void;
+    onOpenChange?: (open: boolean) => void;
 }
 
 export function Sidebar({
@@ -37,8 +38,15 @@ export function Sidebar({
     onTimeScaleChange,
     performanceSettings,
     onPerformanceSettingsChange,
+    onOpenChange,
 }: SidebarProps) {
-    const [isOpen, setIsOpen] = useState(true);
+    const [isOpen, setIsOpen] = useState(false);
+
+    const toggle = () => {
+        const next = !isOpen;
+        setIsOpen(next);
+        onOpenChange?.(next);
+    };
 
     const getTypeIcon = (type: string) => {
         switch (type) {
@@ -53,19 +61,13 @@ export function Sidebar({
 
     return (
         <>
-            {/* Sidebar */}
+            {/* Sidebar panel */}
             <div
-                className={`fixed top-0 left-0 h-full bg-gray-900/95 backdrop-blur-sm border-r border-gray-700 transition-all duration-300 z-40 ${isOpen ? 'w-80 translate-x-0' : 'w-80 -translate-x-full'
-                    }`}
+                className={`fixed top-0 left-0 h-full bg-gray-900/95 backdrop-blur-sm border-r border-gray-700 transition-all duration-300 z-40 w-80 ${
+                    isOpen ? 'translate-x-0' : '-translate-x-full'
+                }`}
             >
-                {/* Toggle button */}
-                <button
-                    onClick={() => setIsOpen(!isOpen)}
-                    className="fixed top-4 right-4 z-50 p-2 bg-gray-900/90 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors"
-                >
-                    {isOpen ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-                </button>
-                <div className="flex flex-col h-full pt-16">
+                <div className="flex flex-col h-full pt-4">
                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
                         {/* Time Scale Control */}
                         <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700">
@@ -112,7 +114,6 @@ export function Sidebar({
                                 <span className="text-xs text-gray-400">Display Settings</span>
                             </div>
 
-                            {/* Show Labels Toggle */}
                             <label className="flex items-center justify-between py-2 cursor-pointer hover:bg-gray-700/30 rounded px-2 -mx-2">
                                 <div className="flex items-center gap-2">
                                     {performanceSettings.showLabels ? (
@@ -133,7 +134,6 @@ export function Sidebar({
                                 />
                             </label>
 
-                            {/* Show Galaxy Toggle */}
                             <label className="flex items-center justify-between py-2 cursor-pointer hover:bg-gray-700/30 rounded px-2 -mx-2">
                                 <div className="flex items-center gap-2">
                                     {performanceSettings.showGalaxy ? (
@@ -154,7 +154,6 @@ export function Sidebar({
                                 />
                             </label>
 
-                            {/* Enable Bloom Toggle */}
                             <label className="flex items-center justify-between py-2 cursor-pointer hover:bg-gray-700/30 rounded px-2 -mx-2">
                                 <div className="flex items-center gap-2">
                                     {performanceSettings.enableBloom ? (
@@ -175,12 +174,10 @@ export function Sidebar({
                                 />
                             </label>
 
-                            {/* Separator */}
                             <div className="border-t border-gray-600 my-2 pt-2">
                                 <span className="text-xs text-gray-500">Performance</span>
                             </div>
 
-                            {/* Frustum Culling Toggle */}
                             <label className="flex items-center justify-between py-2 cursor-pointer hover:bg-gray-700/30 rounded px-2 -mx-2">
                                 <div className="flex items-center gap-2">
                                     <span className={`text-xs font-mono px-1 rounded ${performanceSettings.useFrustumCulling ? 'bg-green-600' : 'bg-gray-600'}`}>BVH</span>
@@ -197,7 +194,6 @@ export function Sidebar({
                                 />
                             </label>
 
-                            {/* Visibility toggle */}
                             <label className="flex items-center justify-between py-2 cursor-pointer hover:bg-gray-700/30 rounded px-2 -mx-2">
                                 <div className="flex items-center gap-2">
                                     {performanceSettings.showLabels ? (
@@ -233,6 +229,24 @@ export function Sidebar({
                     </div>
                 </div>
             </div>
+
+            {/*
+              Toggle button — lives OUTSIDE the sidebar div so the sidebar's
+              CSS transform doesn't drag it off-screen when collapsed.
+              Sits just below the FPS meter (top-14 ≈ 56px, meter is ~48px tall).
+              Slides right to hug the sidebar edge when open.
+            */}
+            <button
+                onClick={toggle}
+                className={`fixed top-14 z-50 p-2 bg-gray-900/90 border border-gray-700 hover:bg-gray-800 transition-all duration-300 ${
+                    isOpen
+                        ? 'left-80 rounded-r-lg border-l-0'
+                        : 'left-0 rounded-r-lg'
+                }`}
+                title={isOpen ? 'Close sidebar' : 'Open sidebar'}
+            >
+                {isOpen ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+            </button>
         </>
     );
 }

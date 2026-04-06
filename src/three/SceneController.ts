@@ -18,8 +18,8 @@ export interface SceneConfig {
   onObjectSelected?: (name: string, position: THREE.Vector3) => void;
   onControlsLocked?: (locked: boolean) => void;
   onTrackingChange?: (isTracking: boolean, target: string | null) => void;
-  onEarthHover?: (hovered: boolean) => void;
-  onEarthClick?: () => void;
+  onPlanetHover?: (name: string | null) => void;
+  onPlanetClick?: (name: string) => void;
 }
 
 export class SceneController {
@@ -63,25 +63,25 @@ export class SceneController {
   private trackingTarget: string | null = null;
   private trackingOffset: THREE.Vector3 = new THREE.Vector3(0, 20, 50);
 
-  // Raycasting for Earth interaction
+  // Raycasting for planet hover/click
   private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2(-9999, -9999);
-  private isEarthHovered = false;
+  private hoveredPlanet: string | null = null;
 
   // Callbacks
   private onObjectSelected?: (name: string, position: THREE.Vector3) => void;
   private onControlsLocked?: (locked: boolean) => void;
   private onTrackingChange?: (isTracking: boolean, target: string | null) => void;
-  private onEarthHover?: (hovered: boolean) => void;
-  private onEarthClick?: () => void;
+  private onPlanetHover?: (name: string | null) => void;
+  private onPlanetClick?: (name: string) => void;
 
   constructor(config: SceneConfig) {
     this.container = config.container;
     this.onObjectSelected = config.onObjectSelected;
     this.onControlsLocked = config.onControlsLocked;
     this.onTrackingChange = config.onTrackingChange;
-    this.onEarthHover = config.onEarthHover;
-    this.onEarthClick = config.onEarthClick;
+    this.onPlanetHover = config.onPlanetHover;
+    this.onPlanetClick = config.onPlanetClick;
 
     // Initialize Three.js
     this.scene = new THREE.Scene();
@@ -312,11 +312,12 @@ export class SceneController {
   };
 
   private handleMouseDown = (event: MouseEvent): void => {
-    // Only intercept left clicks when pointer is NOT locked and Earth is hovered
-    if (event.button === 0 && this.isEarthHovered && !document.pointerLockElement) {
+    // Only intercept left clicks when pointer is NOT locked and a planet is hovered
+    if (event.button === 0 && this.hoveredPlanet && !document.pointerLockElement) {
       event.stopImmediatePropagation(); // Prevent FlyControls from requesting pointer lock
-      this.flyTo('Earth');
-      this.onEarthClick?.();
+      const name = this.hoveredPlanet;
+      this.flyTo(name);
+      this.onPlanetClick?.(name);
     }
   };
 
@@ -495,6 +496,7 @@ export class SceneController {
   // Show all scene objects (when culling disabled)
   private showAllObjects(): void {
     this.scene.traverse((object) => {
+      if (object.userData.isOutline) return;
       if (object instanceof THREE.Mesh || object instanceof THREE.InstancedMesh || object instanceof THREE.Sprite) {
         object.visible = true;
       }
@@ -526,6 +528,9 @@ export class SceneController {
     this.scene.traverse((object) => {
       // Skip the scene itself
       if (object === this.scene) return;
+
+      // Skip outline meshes — their visibility is controlled by hover logic, not culling
+      if (object.userData.isOutline) return;
 
       // Skip starfield (always visible - it's the background)
       if (object.name === 'Starfield') return;
@@ -688,26 +693,29 @@ export class SceneController {
     // Perform frustum culling on entire scene
     this.performSceneCulling();
 
-    // Earth hover raycasting (only when pointer is free)
+    // Planet hover raycasting (only when pointer is free)
     if (!document.pointerLockElement) {
-      const earthMesh = this.solarSystem.earthMesh;
-      if (earthMesh) {
+      const meshes = Array.from(this.solarSystem.planetMeshes.values());
+      if (meshes.length > 0) {
         this.raycaster.setFromCamera(this.mouse, this.camera);
-        const hits = this.raycaster.intersectObject(earthMesh, false);
-        const nowHovered = hits.length > 0;
-        if (nowHovered !== this.isEarthHovered) {
-          this.isEarthHovered = nowHovered;
-          this.solarSystem.showEarthOutline(nowHovered);
+        const hits = this.raycaster.intersectObjects(meshes, false);
+        const nowHovered: string | null = hits.length > 0
+          ? (hits[0].object.userData.planetName as string) ?? null
+          : null;
+        if (nowHovered !== this.hoveredPlanet) {
+          if (this.hoveredPlanet) this.solarSystem.showOutline(this.hoveredPlanet, false);
+          this.hoveredPlanet = nowHovered;
+          if (nowHovered) this.solarSystem.showOutline(nowHovered, true);
           this.renderer.domElement.style.cursor = nowHovered ? 'pointer' : '';
-          this.onEarthHover?.(nowHovered);
+          this.onPlanetHover?.(nowHovered);
         }
       }
-    } else if (this.isEarthHovered) {
+    } else if (this.hoveredPlanet) {
       // Clear hover state when pointer gets locked
-      this.isEarthHovered = false;
-      this.solarSystem.showEarthOutline(false);
+      this.solarSystem.showOutline(this.hoveredPlanet, false);
+      this.hoveredPlanet = null;
       this.renderer.domElement.style.cursor = '';
-      this.onEarthHover?.(false);
+      this.onPlanetHover?.(null);
     }
 
     // Render with or without post-processing
